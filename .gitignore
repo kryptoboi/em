@@ -1,0 +1,6 @@
+.DS_Store
+Thumbs.db
+*.log
+# never commit a service-account key
+*.json
+!package.json

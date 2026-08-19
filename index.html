@@ -1,0 +1,960 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-CV3FXGD06L"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-CV3FXGD06L');
+</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Emores Gallery</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Playfair+Display:wght@700&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0c0c0e;
+    --surface: #141416;
+    --border: rgba(255,255,255,0.08);
+    --accent: #d4a853;
+    --accent-dim: rgba(212,168,83,0.15);
+    --text: #f0ede6;
+    --text-muted: #7a7870;
+    --text-dim: #444240;
+    --radius: 4px;
+  }
+
+  html, body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    min-height: 100vh;
+  }
+
+  /* ── Header ── */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 24px 32px 20px;
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    background: var(--bg);
+    z-index: 10;
+  }
+  .logo {
+    font-family: 'Playfair Display', serif;
+    font-size: 22px;
+    color: var(--text);
+  }
+  .logo span { color: var(--accent); }
+
+  .header-right { display: flex; align-items: center; gap: 16px; }
+
+  #status-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--accent); box-shadow: 0 0 6px var(--accent);
+    animation: pulse 2s infinite;
+  }
+  #status-dot.error { background: #e24b4a; box-shadow: 0 0 6px #e24b4a; animation: none; }
+  #status-dot.loading { background: var(--text-muted); box-shadow: none; animation: none; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+  #status-text { color: var(--text-muted); font-size: 11px; }
+
+  .btn {
+    background: none; border: 1px solid var(--border);
+    color: var(--text-muted); padding: 6px 14px;
+    border-radius: var(--radius); cursor: pointer;
+    font-family: 'DM Mono', monospace; font-size: 11px;
+    letter-spacing: .05em; transition: all .2s;
+  }
+  .btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* ── Stats ── */
+  .stats-bar {
+    display: flex; gap: 32px;
+    padding: 14px 32px; border-bottom: 1px solid var(--border);
+  }
+  .stat { display: flex; flex-direction: column; gap: 2px; }
+  .stat-label { color: var(--text-dim); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; }
+  .stat-value { color: var(--text); font-size: 14px; }
+  .stat-value.accent { color: var(--accent); }
+
+  /* ── Filter bar ── */
+  .filter-bar {
+    display: flex; align-items: center; gap: 12px;
+    padding: 14px 32px; border-bottom: 1px solid var(--border);
+  }
+  .filter-label { color: var(--text-muted); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; }
+  #search-input {
+    background: var(--surface); border: 1px solid var(--border);
+    color: var(--text); padding: 6px 12px; border-radius: var(--radius);
+    font-family: 'DM Mono', monospace; font-size: 12px; width: 220px;
+    outline: none; transition: border-color .2s;
+  }
+  #search-input:focus { border-color: var(--accent); }
+  #search-input::placeholder { color: var(--text-dim); }
+
+  .sort-select {
+    background: var(--surface); border: 1px solid var(--border);
+    color: var(--text); padding: 6px 12px; border-radius: var(--radius);
+    font-family: 'DM Mono', monospace; font-size: 12px;
+    cursor: pointer; outline: none; transition: border-color .2s;
+  }
+  .sort-select:focus { border-color: var(--accent); }
+
+  /* ── New banner ── */
+  #new-banner {
+    display: none; align-items: center; gap: 10px;
+    margin: 16px 32px 0; padding: 10px 16px;
+    background: var(--accent-dim); border: 1px solid rgba(212,168,83,.3);
+    border-radius: var(--radius); font-size: 12px; color: var(--accent);
+    cursor: pointer; transition: background .2s;
+  }
+  #new-banner:hover { background: rgba(212,168,83,.22); }
+  #new-banner.visible { display: flex; }
+  .new-dot { width:6px; height:6px; border-radius:50%; background:var(--accent); flex-shrink:0; }
+
+  /* ── Gallery grid ── */
+  #gallery {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 3px;
+    padding: 18px 32px 40px;
+  }
+
+  /* Tablet portrait */
+  @media (max-width: 900px) {
+    #gallery { grid-template-columns: repeat(2, 1fr); }
+  }
+
+  /* Mobile portrait */
+  @media (max-width: 600px) {
+    #gallery {
+      grid-template-columns: repeat(2, 1fr);
+      padding: 12px 8px 32px;
+      gap: 2px;
+    }
+  }
+
+  /* Mobile landscape */
+  @media (max-width: 900px) and (orientation: landscape) {
+    #gallery { grid-template-columns: repeat(4, 1fr); }
+  }
+
+  .img-item {
+    position: relative;
+    aspect-ratio: 3 / 2;   /* szerokość > wysokość, nie kwadrat */
+    overflow: hidden;
+    background: var(--surface);
+    cursor: pointer;
+    transition: transform .18s;
+  }
+  .img-item.portrait {
+    aspect-ratio: 2 / 3;   /* pionowy format */
+    width: 44%;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  .img-item:hover { transform: scale(1.02); z-index: 2; }
+
+  .img-item.is-new::after {
+    content: 'NEW'; position: absolute; top: 8px; right: 8px;
+    background: var(--accent); color: #0c0c0e;
+    font-size: 9px; font-weight: 500; letter-spacing: .1em;
+    padding: 2px 6px; border-radius: 2px;
+  }
+
+  .img-item img {
+    width: 100%; height: 100%; object-fit: cover; display: block;
+    transition: opacity .3s; opacity: 0;
+  }
+  .img-item img.loaded { opacity: 1; }
+
+  .img-overlay {
+    position: absolute; bottom:0; left:0; right:0;
+    padding: 28px 10px 8px;
+    background: linear-gradient(transparent, rgba(0,0,0,.75));
+    opacity: 0; transition: opacity .2s;
+    font-size: 10px; color: #eee; word-break: break-all; line-height: 1.4;
+  }
+  .img-item:hover .img-overlay { opacity: 1; }
+
+  /* ── Load more ── */
+  #load-more-wrap {
+    display: flex; justify-content: center;
+    padding: 0 32px 48px;
+  }
+  #load-more-btn {
+    background: none; border: 1px solid var(--border);
+    color: var(--text-muted); padding: 10px 32px;
+    border-radius: var(--radius); cursor: pointer;
+    font-family: 'DM Mono', monospace; font-size: 12px;
+    letter-spacing: .06em; transition: all .2s;
+  }
+  #load-more-btn:hover { border-color: var(--accent); color: var(--accent); }
+  #load-more-btn:disabled { opacity: .3; cursor: default; }
+  #load-more-btn.hidden { display: none; }
+
+  /* ── Skeleton ── */
+  .skeleton {
+    aspect-ratio: 3/2; background: var(--surface);
+    position: relative; overflow: hidden;
+  }
+  .skeleton::after {
+    content:''; position:absolute; inset:0;
+    background:linear-gradient(90deg,transparent 0%,rgba(255,255,255,.04) 50%,transparent 100%);
+    animation: shimmer 1.4s infinite;
+  }
+  @keyframes shimmer { from{transform:translateX(-100%)} to{transform:translateX(100%)} }
+
+  /* ── CORS hint ── */
+  #cors-hint {
+    display:none; margin:0 32px; padding:14px 18px;
+    background:rgba(226,75,74,.08); border:1px solid rgba(226,75,74,.25);
+    border-radius:var(--radius); color:#f09595; font-size:12px; line-height:1.6;
+  }
+  #cors-hint.visible { display:block; }
+  #cors-hint code { background:rgba(255,255,255,.06); padding:1px 5px; border-radius:2px; font-size:11px; }
+
+  /* ── Message ── */
+  #message {
+    display:none; flex-direction:column; align-items:center;
+    gap:12px; padding:80px 32px; color:var(--text-muted);
+    font-size:13px; text-align:center;
+  }
+  #message.visible { display:flex; }
+
+  /* ════════════════════════════════════════
+     LIGHTBOX
+  ════════════════════════════════════════ */
+  #lightbox {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.94);
+    z-index: 200;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    touch-action: none;
+  }
+  #lightbox.open { display: flex; }
+
+  #lb-toolbar {
+    position: fixed; top: 0; left: 0; right: 0;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 20px;
+    background: linear-gradient(rgba(0,0,0,.7), transparent);
+    z-index: 210;
+    gap: 12px;
+  }
+  #lb-name {
+    color: var(--text-muted); font-size: 12px;
+    letter-spacing: .04em; flex: 1;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  #lb-zoom-level {
+    color: var(--text-muted); font-size: 12px;
+    min-width: 48px; text-align: center;
+  }
+  .lb-btn {
+    background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.12);
+    color: var(--text); width: 36px; height: 36px;
+    border-radius: var(--radius); cursor: pointer;
+    font-size: 18px; line-height: 1;
+    display: flex; align-items: center; justify-content: center;
+    transition: background .15s; user-select: none;
+    flex-shrink: 0;
+  }
+  .lb-btn:hover { background: rgba(255,255,255,.12); }
+
+  #lb-canvas {
+    position: fixed; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    overflow: hidden;
+    cursor: grab;
+  }
+  #lb-canvas.grabbing { cursor: grabbing; }
+
+  #lb-spinner {
+    position: absolute;
+    width: 40px; height: 40px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin .8s linear infinite;
+    pointer-events: none;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  #lb-spinner.hidden { display: none; }
+
+  #lb-img {
+    position: absolute;
+    transform-origin: 0 0;
+    will-change: transform;
+    max-width: none; max-height: none;
+    user-select: none; -webkit-user-drag: none;
+    transition: opacity .25s;
+    opacity: 0;
+    display: block;
+  }
+  #lb-img.loaded { opacity: 1; }
+
+  .lb-arrow {
+    position: fixed; top: 50%; transform: translateY(-50%);
+    background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.1);
+    color: var(--text); width: 44px; height: 44px;
+    border-radius: var(--radius); cursor: pointer;
+    font-size: 20px; line-height: 1;
+    display: flex; align-items: center; justify-content: center;
+    transition: background .15s, opacity .2s;
+    z-index: 210; user-select: none;
+  }
+  .lb-arrow:hover { background: rgba(255,255,255,.14); }
+  .lb-arrow.hidden { opacity: 0; pointer-events: none; }
+  #lb-prev { left: 12px; }
+  #lb-next { right: 12px; }
+
+  #lb-footer {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    display: flex; align-items: center; justify-content: center;
+    padding: 12px 20px;
+    background: linear-gradient(transparent, rgba(0,0,0,.7));
+    z-index: 210;
+  }
+  #lb-counter { color: var(--text-muted); font-size: 11px; }
+
+  /* ── Scrollbar ── */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--text-dim); border-radius: 3px; }
+
+  @media (max-width: 600px) {
+    header { padding: 16px 16px 14px; }
+    .stats-bar { padding: 10px 16px; gap: 20px; overflow-x: auto; flex-wrap: nowrap; }
+    .filter-bar { padding: 10px 16px; flex-wrap: wrap; }
+    .lb-arrow { display: none; }
+    #load-more-wrap { padding: 0 16px 32px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">emores<span>.</span></div>
+  <div class="header-right">
+    <div id="status-dot" class="loading"></div>
+    <span id="status-text">łączenie…</span>
+    <button class="btn" id="refresh-btn">↺ odśwież</button>
+  </div>
+</header>
+
+<div class="stats-bar">
+  <div class="stat">
+    <span class="stat-label">Wszystkie obrazy</span>
+    <span class="stat-value" id="total-count">—</span>
+  </div>
+  <div class="stat">
+    <span class="stat-label">Nowe (24h)</span>
+    <span class="stat-value accent" id="new-count">—</span>
+  </div>
+  <div class="stat">
+    <span class="stat-label">Ostatnie odświeżenie</span>
+    <span class="stat-value" id="last-refresh">—</span>
+  </div>
+  <div class="stat">
+    <span class="stat-label">Następne za</span>
+    <span class="stat-value" id="next-refresh">—</span>
+  </div>
+</div>
+
+<div class="filter-bar">
+  <span class="filter-label">Filtr</span>
+  <input type="text" id="search-input" placeholder="szukaj po nazwie…" />
+  <select class="sort-select" id="sort-select">
+    <option value="newest">Najnowsze</option>
+    <option value="oldest">Najstarsze</option>
+    <option value="name">Nazwa A–Z</option>
+    <option value="size">Rozmiar</option>
+  </select>
+</div>
+
+<div id="cors-hint"></div>
+<div id="new-banner"><span class="new-dot"></span><span id="new-banner-text"></span></div>
+
+<div id="gallery"></div>
+<div id="load-more-wrap">
+  <button id="load-more-btn" class="hidden">Wczytaj więcej</button>
+</div>
+<div id="message"><span id="message-text">Ładowanie…</span></div>
+
+<!-- ── Lightbox ── -->
+<div id="lightbox" role="dialog" aria-modal="true" aria-label="Podgląd obrazu">
+  <div id="lb-toolbar">
+    <span id="lb-name"></span>
+    <span id="lb-zoom-level">100%</span>
+    <button class="lb-btn" id="lb-zoom-out" title="Pomniejsz (−)">−</button>
+    <button class="lb-btn" id="lb-zoom-in" title="Powiększ (+)">+</button>
+    <button class="lb-btn" id="lb-zoom-fit" title="Dopasuj (0)">⊡</button>
+    <button class="lb-btn" id="lb-download" title="Pobierz">↓</button>
+    <button class="lb-btn" id="lb-close" title="Zamknij (Esc)">✕</button>
+  </div>
+
+  <div id="lb-canvas">
+    <div id="lb-spinner"></div>
+    <img id="lb-img" src="" alt="" draggable="false" />
+  </div>
+
+  <button class="lb-arrow" id="lb-prev">‹</button>
+  <button class="lb-arrow" id="lb-next">›</button>
+
+  <div id="lb-footer">
+    <span id="lb-counter"></span>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════════════
+//  CONFIG
+// ══════════════════════════════════════════════════════════════
+const BUCKET_URL   = 'https://storage.googleapis.com/emores/';
+const ORIG_PREFIX  = 'emores2/';            // oryginały w root
+const THUMB_PREFIX = 'thumbs/';     // miniatury w tym folderze
+const PAGE_SIZE    = 10;             // ile zdjęć wczytać na raz
+const REFRESH_SEC  = 5;
+const ZOOM_STEP    = 0.25;
+const ZOOM_MIN     = 0.1;
+const ZOOM_MAX     = 8;
+const IMAGE_EXT    = /\.(jpe?g|png|gif|webp|svg|bmp|tiff?)$/i;
+
+// ══════════════════════════════════════════════════════════════
+//  STATE
+// ══════════════════════════════════════════════════════════════
+let allImages     = [];   // wszystkie pobrane [{key, size, lastMod, url, thumbUrl}]
+let visibleImages = [];   // po filtrach/sortowaniu
+let renderedCount = 0;    // ile kafelek już wyrenderowano
+let knownKeys     = new Set();
+let pendingNew    = [];
+let countdown     = REFRESH_SEC;
+let countdownTimer = null;
+let initialized   = false;
+
+// Lightbox state
+let lbIndex  = 0;
+let lbScale  = 1;
+let lbTransX = 0;
+let lbTransY = 0;
+let lbNaturalW = 0;
+let lbNaturalH = 0;
+
+// Drag
+let isDragging = false;
+let dragStartX = 0, dragStartY = 0;
+let dragOriginX = 0, dragOriginY = 0;
+
+// Pinch
+let lastPinchDist = null;
+let lastPinchScale = 1;
+
+// ══════════════════════════════════════════════════════════════
+//  DOM REFS
+// ══════════════════════════════════════════════════════════════
+const gallery       = document.getElementById('gallery');
+const statusDot     = document.getElementById('status-dot');
+const statusText    = document.getElementById('status-text');
+const totalCount    = document.getElementById('total-count');
+const newCount      = document.getElementById('new-count');
+const lastRefresh   = document.getElementById('last-refresh');
+const nextRefresh   = document.getElementById('next-refresh');
+const searchInput   = document.getElementById('search-input');
+const sortSelect    = document.getElementById('sort-select');
+const newBanner     = document.getElementById('new-banner');
+const newBannerTxt  = document.getElementById('new-banner-text');
+const message       = document.getElementById('message');
+const messageTxt    = document.getElementById('message-text');
+const corsHint      = document.getElementById('cors-hint');
+const loadMoreBtn   = document.getElementById('load-more-btn');
+const loadMoreWrap  = document.getElementById('load-more-wrap');
+
+const lightbox  = document.getElementById('lightbox');
+const lbCanvas  = document.getElementById('lb-canvas');
+const lbImg     = document.getElementById('lb-img');
+const lbSpinner = document.getElementById('lb-spinner');
+const lbName    = document.getElementById('lb-name');
+const lbZoom    = document.getElementById('lb-zoom-level');
+const lbCounter = document.getElementById('lb-counter');
+const lbPrev    = document.getElementById('lb-prev');
+const lbNext    = document.getElementById('lb-next');
+
+// ══════════════════════════════════════════════════════════════
+//  UTILS
+// ══════════════════════════════════════════════════════════════
+const setStatus = (cls, txt) => { statusDot.className = cls; statusText.textContent = txt; };
+const fmtSize   = b => b < 1024 ? b+'B' : b < 1048576 ? (b/1024).toFixed(1)+'KB' : (b/1048576).toFixed(1)+'MB';
+const fmtTime   = iso => { const d=new Date(iso); return d.toLocaleDateString('pl-PL')+' '+d.toLocaleTimeString('pl-PL',{hour:'2-digit',minute:'2-digit'}); };
+const isNew24h  = iso => Date.now()-new Date(iso).getTime() < 86400000;
+const clamp     = (v,mn,mx) => Math.min(mx,Math.max(mn,v));
+
+// ══════════════════════════════════════════════════════════════
+//  FETCH & PARSE
+//  Oryginały: gs://emores/emores2/foto.jpg
+//  Thumbnaily: gs://emores/thumbs/foto_64x64_thumbnail.jpg
+// ══════════════════════════════════════════════════════════════
+async function fetchListing() {
+  setStatus('loading', 'pobieranie…');
+  try {
+    const res = await fetch(BUCKET_URL, { cache: 'no-store' });
+    if (!res.ok) throw new Error('HTTP '+res.status);
+    const xml = await res.text();
+    return parseXML(xml);
+  } catch(err) {
+    if (/fetch|Network|CORS/i.test(err.message)) showCorsHint();
+    throw err;
+  }
+}
+
+function parseXML(xml) {
+  const doc = new DOMParser().parseFromString(xml, 'application/xml');
+  const thumbKeys = new Set();
+  const items = [];
+
+  // Zbierz wszystkie klucze miniatur
+  doc.querySelectorAll('Contents').forEach(n => {
+    const key = n.querySelector('Key')?.textContent || '';
+    if (key.startsWith(THUMB_PREFIX)) thumbKeys.add(key);
+  });
+
+  // Zbierz oryginały z folderu emores2/
+  doc.querySelectorAll('Contents').forEach(n => {
+    const key = n.querySelector('Key')?.textContent || '';
+
+    // Pokaż tylko obrazki z folderu emores2/
+    const isImage = key.startsWith(ORIG_PREFIX) && IMAGE_EXT.test(key);
+
+    if (!isImage) return;
+
+    const size    = parseInt(n.querySelector('Size')?.textContent||'0');
+    const lastMod = n.querySelector('LastModified')?.textContent||'';
+    const baseName = key.includes('/') ? key.split('/').pop() : key;
+    const nameParts = baseName.split('.');
+    const ext = nameParts.pop().toLowerCase();
+    const nameNoExt = nameParts.join('.');
+    const thumbKey = THUMB_PREFIX + nameNoExt + '_64x64_thumbnail.' + ext;
+
+    items.push({
+      key,
+      size,
+      lastMod,
+      url:      BUCKET_URL + key.split('/').map(encodeURIComponent).join('/'),
+      thumbUrl: BUCKET_URL + thumbKey.split('/').map(encodeURIComponent).join('/'),
+      hasThumb: thumbKeys.has(thumbKey)
+    });
+  });
+
+  return items;
+}
+
+// ══════════════════════════════════════════════════════════════
+//  RENDER GALLERY z lazy loading (PAGE_SIZE na raz)
+// ══════════════════════════════════════════════════════════════
+function applyFiltersAndSort(imgs) {
+  const q  = searchInput.value.trim().toLowerCase();
+  const by = sortSelect.value;
+  let arr  = q ? imgs.filter(i => i.key.toLowerCase().includes(q)) : [...imgs];
+  if (by==='newest') arr.sort((a,b)=>new Date(b.lastMod)-new Date(a.lastMod));
+  else if (by==='oldest') arr.sort((a,b)=>new Date(a.lastMod)-new Date(b.lastMod));
+  else if (by==='name')   arr.sort((a,b)=>a.key.localeCompare(b.key));
+  else if (by==='size')   arr.sort((a,b)=>b.size-a.size);
+  return arr;
+}
+
+function renderGallery(imgs, highlight=new Set()) {
+  visibleImages = applyFiltersAndSort(imgs);
+  renderedCount = 0;
+  gallery.innerHTML = '';
+
+  if (!visibleImages.length) {
+    messageTxt.textContent = searchInput.value ? 'Brak wyników.' : 'Brak obrazów w buckecie.';
+    message.classList.add('visible');
+    loadMoreBtn.classList.add('hidden');
+    return;
+  }
+  message.classList.remove('visible');
+  renderNextPage(highlight);
+}
+
+let loadMoreSentinel = null;
+
+function renderNextPage(highlight=new Set()) {
+  const batch = visibleImages.slice(renderedCount, renderedCount + PAGE_SIZE);
+
+  // Usuń poprzedni sentinel
+  if (loadMoreSentinel) loadMoreSentinel.remove();
+
+  batch.forEach((img, i) => {
+    const idx = renderedCount + i;
+    const isN = highlight.has(img.key);
+    const src = img.hasThumb ? img.thumbUrl : img.url;
+
+    const item = document.createElement('div');
+    item.className = 'img-item' + (isN ? ' is-new' : '');
+    item.dataset.idx = idx;
+    item.innerHTML = `
+      <img src="${src}" alt="${img.key}" loading="lazy" />
+      <div class="img-overlay">${img.key.split('/').pop()}<br>${fmtSize(img.size)} · ${fmtTime(img.lastMod)}</div>`;
+
+    const imgEl = item.querySelector('img');
+    imgEl.addEventListener('load', () => {
+      imgEl.classList.add('loaded');
+      if (imgEl.naturalHeight > imgEl.naturalWidth) {
+        item.classList.add('portrait');
+      }
+    });
+    imgEl.addEventListener('error', () => {
+      if (img.url && imgEl.src !== img.url) imgEl.src = img.url;
+    });
+    item.addEventListener('click', () => openLightbox(idx));
+    gallery.appendChild(item);
+  });
+
+  renderedCount += batch.length;
+
+  // Jeśli są jeszcze obrazy do wczytania, stwórz sentinel do infinite scroll
+  if (renderedCount < visibleImages.length) {
+    loadMoreSentinel = document.createElement('div');
+    loadMoreSentinel.style.gridColumn = '1 / -1';
+    loadMoreSentinel.style.height = '1px';
+    gallery.appendChild(loadMoreSentinel);
+    infiniteScrollObserver.observe(loadMoreSentinel);
+  } else {
+    loadMoreSentinel = null;
+  }
+}
+
+// IntersectionObserver do infinite scroll
+const infiniteScrollObserver = new IntersectionObserver(entries => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      renderNextPage();
+    }
+  });
+}, { rootMargin: '100px' });
+
+// Ukryj przycisk "wczytaj więcej"
+loadMoreWrap.style.display = 'none';
+
+// ══════════════════════════════════════════════════════════════
+//  LOAD DATA
+// ══════════════════════════════════════════════════════════════
+async function load(isInitial=false) {
+  try {
+    const imgs = await fetchListing();
+    const newKeys = new Set();
+    if (!isInitial && knownKeys.size>0)
+      imgs.forEach(i => { if (!knownKeys.has(i.key)) newKeys.add(i.key); });
+
+    knownKeys = new Set(imgs.map(i=>i.key));
+    allImages = imgs;
+
+    totalCount.textContent  = imgs.length;
+    newCount.textContent    = imgs.filter(i=>isNew24h(i.lastMod)).length;
+    lastRefresh.textContent = new Date().toLocaleTimeString('pl-PL',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+
+    renderGallery(imgs, newKeys);
+    setStatus('', 'aktywny');
+    corsHint.classList.remove('visible');
+
+    if (newKeys.size>0) {
+      pendingNew = [...newKeys];
+      newBannerTxt.textContent = `${newKeys.size} nowych obrazów — kliknij, aby zobaczyć`;
+      newBanner.classList.add('visible');
+    }
+    initialized = true;
+  } catch(err) {
+    setStatus('error','błąd połączenia');
+    if (!initialized) {
+      messageTxt.textContent = 'Nie można pobrać listy. Sprawdź URL bucketu i uprawnienia.';
+      message.classList.add('visible');
+    }
+    console.error('[emores]', err);
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  LIGHTBOX — OPEN / CLOSE / NAV
+// ══════════════════════════════════════════════════════════════
+function openLightbox(idx) {
+  lbIndex = idx;
+  lightbox.classList.add('open');
+  document.body.style.overflow = 'hidden';
+  loadLightboxImage();
+}
+
+function closeLightbox() {
+  lightbox.classList.remove('open');
+  document.body.style.overflow = '';
+  lbImg.src = '';
+  lbImg.classList.remove('loaded');
+}
+
+function loadLightboxImage() {
+  const img = visibleImages[lbIndex];
+  if (!img) return;
+
+  lbName.textContent    = img.key.split('/').pop();
+  lbCounter.textContent = `${lbIndex+1} / ${visibleImages.length}`;
+  lbPrev.classList.toggle('hidden', lbIndex===0);
+  lbNext.classList.toggle('hidden', lbIndex===visibleImages.length-1);
+
+  lbImg.classList.remove('loaded');
+  lbSpinner.classList.remove('hidden');
+
+  const fullImg = new Image();
+  fullImg.onload = () => {
+    lbNaturalW = fullImg.naturalWidth;
+    lbNaturalH = fullImg.naturalHeight;
+    lbImg.src = img.url;
+    lbImg.onload = () => {
+      lbSpinner.classList.add('hidden');
+      lbImg.classList.add('loaded');
+      resetZoom();
+    };
+  };
+  fullImg.onerror = () => { lbSpinner.classList.add('hidden'); };
+  fullImg.src = img.url;
+}
+
+function navigate(dir) {
+  const next = lbIndex + dir;
+  if (next < 0 || next >= visibleImages.length) return;
+  lbIndex = next;
+  loadLightboxImage();
+}
+
+// ══════════════════════════════════════════════════════════════
+//  LIGHTBOX — ZOOM & PAN
+// ══════════════════════════════════════════════════════════════
+function applyTransform() {
+  const vw = lbCanvas.clientWidth;
+  const vh = lbCanvas.clientHeight;
+  const iw = lbImg.clientWidth  || lbNaturalW;
+  const ih = lbImg.clientHeight || lbNaturalH;
+
+  const scaledW = iw * lbScale;
+  const scaledH = ih * lbScale;
+  const maxX = Math.max(0, (scaledW - vw) / 2);
+  const maxY = Math.max(0, (scaledH - vh) / 2);
+
+  lbTransX = clamp(lbTransX, -maxX, maxX);
+  lbTransY = clamp(lbTransY, -maxY, maxY);
+
+  const cx = (vw - iw) / 2;
+  const cy = (vh - ih) / 2;
+
+  lbImg.style.transform = `translate(${cx + lbTransX}px, ${cy + lbTransY}px) scale(${lbScale})`;
+  lbZoom.textContent = Math.round(lbScale * 100) + '%';
+}
+
+function zoomBy(delta, pivotX, pivotY) {
+  const newScale = clamp(lbScale * (1 + delta), ZOOM_MIN, ZOOM_MAX);
+  if (newScale === lbScale) return;
+
+  const vw = lbCanvas.clientWidth;
+  const vh = lbCanvas.clientHeight;
+  const px = (pivotX ?? vw/2) - vw/2;
+  const py = (pivotY ?? vh/2) - vh/2;
+
+  const ratio = newScale / lbScale;
+  lbTransX = px + (lbTransX - px) * ratio;
+  lbTransY = py + (lbTransY - py) * ratio;
+  lbScale = newScale;
+  applyTransform();
+}
+
+function resetZoom() {
+  lbScale  = 1;
+  lbTransX = 0;
+  lbTransY = 0;
+  applyTransform();
+}
+
+function fitToScreen() {
+  if (!lbNaturalW || !lbNaturalH) { resetZoom(); return; }
+  const vw = lbCanvas.clientWidth;
+  const vh = lbCanvas.clientHeight;
+  const fit = Math.min(vw / lbNaturalW, vh / lbNaturalH, 1);
+  lbScale  = fit;
+  lbTransX = 0;
+  lbTransY = 0;
+  applyTransform();
+}
+
+// ── Mouse drag ──
+lbCanvas.addEventListener('mousedown', e => {
+  if (e.button !== 0) return;
+  isDragging = true;
+  dragStartX = e.clientX;
+  dragStartY = e.clientY;
+  dragOriginX = lbTransX;
+  dragOriginY = lbTransY;
+  lbCanvas.classList.add('grabbing');
+  e.preventDefault();
+});
+
+window.addEventListener('mousemove', e => {
+  if (!isDragging) return;
+  lbTransX = dragOriginX + (e.clientX - dragStartX);
+  lbTransY = dragOriginY + (e.clientY - dragStartY);
+  applyTransform();
+});
+
+window.addEventListener('mouseup', () => {
+  isDragging = false;
+  lbCanvas.classList.remove('grabbing');
+});
+
+lbCanvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  const rect = lbCanvas.getBoundingClientRect();
+  const px = e.clientX - rect.left;
+  const py = e.clientY - rect.top;
+  const delta = e.deltaY < 0 ? 0.15 : -0.15;
+  zoomBy(delta, px, py);
+}, { passive: false });
+
+lbCanvas.addEventListener('touchstart', e => {
+  if (e.touches.length === 1) {
+    isDragging = true;
+    dragStartX = e.touches[0].clientX;
+    dragStartY = e.touches[0].clientY;
+    dragOriginX = lbTransX;
+    dragOriginY = lbTransY;
+    lastPinchDist = null;
+  } else if (e.touches.length === 2) {
+    isDragging = false;
+    const dx = e.touches[0].clientX - e.touches[1].clientX;
+    const dy = e.touches[0].clientY - e.touches[1].clientY;
+    lastPinchDist = Math.hypot(dx, dy);
+    lastPinchScale = lbScale;
+  }
+  e.preventDefault();
+}, { passive: false });
+
+lbCanvas.addEventListener('touchmove', e => {
+  if (e.touches.length === 1 && isDragging) {
+    lbTransX = dragOriginX + (e.touches[0].clientX - dragStartX);
+    lbTransY = dragOriginY + (e.touches[0].clientY - dragStartY);
+    applyTransform();
+  } else if (e.touches.length === 2 && lastPinchDist !== null) {
+    const dx   = e.touches[0].clientX - e.touches[1].clientX;
+    const dy   = e.touches[0].clientY - e.touches[1].clientY;
+    const dist = Math.hypot(dx, dy);
+    const cx   = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+    const cy   = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+    const rect = lbCanvas.getBoundingClientRect();
+    const newScale = clamp(lastPinchScale * (dist / lastPinchDist), ZOOM_MIN, ZOOM_MAX);
+    const ratio = newScale / lbScale;
+    const px = cx - rect.left - lbCanvas.clientWidth/2;
+    const py = cy - rect.top  - lbCanvas.clientHeight/2;
+    lbTransX = px + (lbTransX - px) * ratio;
+    lbTransY = py + (lbTransY - py) * ratio;
+    lbScale  = newScale;
+    applyTransform();
+  }
+  e.preventDefault();
+}, { passive: false });
+
+lbCanvas.addEventListener('touchend', e => {
+  if (e.touches.length < 2) lastPinchDist = null;
+  if (e.touches.length === 0) isDragging = false;
+});
+
+// ── Keyboard ──
+document.addEventListener('keydown', e => {
+  if (!lightbox.classList.contains('open')) return;
+  if (e.key==='Escape')           closeLightbox();
+  else if (e.key==='ArrowLeft')   navigate(-1);
+  else if (e.key==='ArrowRight')  navigate(1);
+  else if (e.key==='+' || e.key==='=') zoomBy(ZOOM_STEP);
+  else if (e.key==='-')           zoomBy(-ZOOM_STEP);
+  else if (e.key==='0')           resetZoom();
+  else if (e.key==='f')           fitToScreen();
+});
+
+lbCanvas.addEventListener('dblclick', resetZoom);
+
+document.getElementById('lb-zoom-in').addEventListener('click',  () => zoomBy(ZOOM_STEP));
+document.getElementById('lb-zoom-out').addEventListener('click', () => zoomBy(-ZOOM_STEP));
+document.getElementById('lb-zoom-fit').addEventListener('click', fitToScreen);
+document.getElementById('lb-close').addEventListener('click', closeLightbox);
+lbPrev.addEventListener('click', () => navigate(-1));
+lbNext.addEventListener('click', () => navigate(1));
+
+document.getElementById('lb-download').addEventListener('click', () => {
+  const img = visibleImages[lbIndex];
+  if (!img) return;
+  const a = document.createElement('a');
+  a.href = img.url;
+  a.download = img.key.split('/').pop();
+  a.click();
+});
+
+lightbox.addEventListener('click', e => {
+  if (e.target === lightbox) closeLightbox();
+});
+
+// ══════════════════════════════════════════════════════════════
+//  MISC EVENTS
+// ══════════════════════════════════════════════════════════════
+document.getElementById('refresh-btn').addEventListener('click', () => {
+  clearInterval(countdownTimer);
+  load().then(startCountdown);
+});
+
+newBanner.addEventListener('click', () => {
+  window.scrollTo({top:0,behavior:'smooth'});
+  newBanner.classList.remove('visible');
+  renderGallery(allImages, new Set(pendingNew));
+});
+
+searchInput.addEventListener('input',  () => renderGallery(allImages));
+sortSelect.addEventListener('change',  () => renderGallery(allImages));
+
+function showCorsHint() {
+  corsHint.innerHTML = `
+    <strong>Błąd CORS lub dostępu</strong> — bucket musi być publiczny i mieć politykę CORS:<br>
+    <code>[{"origin":["*"],"method":["GET","HEAD"],"maxAgeSeconds":3600}]</code><br>
+    Zastosuj: <code>gcloud storage buckets update gs://emores --cors-file=cors.json</code>`;
+  corsHint.classList.add('visible');
+}
+
+// ══════════════════════════════════════════════════════════════
+//  COUNTDOWN & INIT
+// ══════════════════════════════════════════════════════════════
+function startCountdown() {
+  countdown = REFRESH_SEC;
+  clearInterval(countdownTimer);
+  countdownTimer = setInterval(() => {
+    countdown--;
+    nextRefresh.textContent = `za ${countdown}s`;
+    if (countdown <= 0) { clearInterval(countdownTimer); load().then(startCountdown); }
+  }, 1000);
+}
+
+// Szkielety podczas ładowania
+gallery.innerHTML = Array.from({length:6},()=>'<div class="skeleton"></div>').join('');
+
+load(true).then(startCountdown);
+</script>
+</body>
+</html>

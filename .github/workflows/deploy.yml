@@ -1,0 +1,33 @@
+name: Deploy index.html to Cloud Storage
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'index.html'
+      - '.github/workflows/deploy.yml'
+  workflow_dispatch:          # lets you also trigger it by hand from the Actions tab
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Upload index.html to gs://emores
+        run: |
+          gcloud storage cp index.html gs://emores/index.html \
+            --content-type="text/html; charset=utf-8" \
+            --cache-control="no-cache, max-age=0"
+
+      - name: Done
+        run: echo "Live at https://storage.googleapis.com/emores/index.html"
