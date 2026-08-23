@@ -5,6 +5,8 @@ on:
     branches: [main]
     paths:
       - 'index.html'
+      - 'videos.html'
+      - 'admin.html'
       - '.github/workflows/deploy.yml'
   workflow_dispatch:          # lets you also trigger it by hand from the Actions tab
 
@@ -23,9 +25,15 @@ jobs:
       - name: Set up gcloud
         uses: google-github-actions/setup-gcloud@v2
 
-      - name: Upload index.html to gs://emores
+      - name: Upload site files to gs://emores
         run: |
           gcloud storage cp index.html gs://emores/index.html \
+            --content-type="text/html; charset=utf-8" \
+            --cache-control="no-cache, max-age=0"
+          gcloud storage cp videos.html gs://emores/videos.html \
+            --content-type="text/html; charset=utf-8" \
+            --cache-control="no-cache, max-age=0"
+          gcloud storage cp admin.html gs://emores/admin.html \
             --content-type="text/html; charset=utf-8" \
             --cache-control="no-cache, max-age=0"
 

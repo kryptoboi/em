@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Emores — Kolejność</title>
+<meta name="robots" content="noindex, nofollow">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Playfair+Display:wght@700&display=swap');
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0c0c0e; --surface: #141416; --border: rgba(255,255,255,0.08);
+    --accent: #d4a853; --accent-dim: rgba(212,168,83,0.15);
+    --text: #f0ede6; --text-muted: #7a7870; --text-dim: #444240; --radius: 4px;
+  }
+  html, body { background: var(--bg); color: var(--text); font-family: 'DM Mono', monospace; font-size: 13px; min-height: 100vh; }
+
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 24px 32px 20px; border-bottom: 1px solid var(--border);
+    position: sticky; top: 0; background: var(--bg); z-index: 10;
+    flex-wrap: wrap; gap: 12px;
+  }
+  .logo { font-family: 'Playfair Display', serif; font-size: 22px; color: var(--text); }
+  .logo span { color: var(--accent); }
+  .top-nav a { color: var(--text-muted); text-decoration: none; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; }
+  .top-nav a:hover { color: var(--accent); }
+
+  .toolbar {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    padding: 14px 32px; border-bottom: 1px solid var(--border);
+  }
+  .btn {
+    background: none; border: 1px solid var(--border);
+    color: var(--text-muted); padding: 7px 14px;
+    border-radius: var(--radius); cursor: pointer;
+    font-family: 'DM Mono', monospace; font-size: 11px;
+    letter-spacing: .05em; transition: all .2s;
+  }
+  .btn:hover { border-color: var(--accent); color: var(--accent); }
+  .btn.primary { border-color: var(--accent); color: var(--accent); }
+  .btn.primary:hover { background: var(--accent-dim); }
+  .btn:disabled { opacity: .35; cursor: default; }
+  .toolbar-sep { width: 1px; align-self: stretch; background: var(--border); margin: 0 4px; }
+  #save-status { font-size: 11px; color: var(--text-muted); }
+  #save-status.ok { color: #8fd18f; }
+  #save-status.err { color: #e24b4a; }
+
+  #gallery {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 6px; padding: 18px 32px 40px;
+  }
+  .g-item {
+    position: relative; aspect-ratio: 1; overflow: hidden;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); cursor: grab;
+  }
+  .g-item.sortable-ghost { opacity: .3; }
+  .g-item.sortable-chosen { border-color: var(--accent); }
+  .g-item img, .thumb-fallback { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .thumb-fallback { display: flex; align-items: center; justify-content: center; color: var(--text-dim); font-size: 10px; }
+  .g-badge {
+    position: absolute; top: 4px; left: 4px;
+    background: rgba(0,0,0,.55); color: var(--accent);
+    font-size: 10px; padding: 1px 6px; border-radius: 2px;
+  }
+  .g-video-tag {
+    position: absolute; top: 4px; right: 4px;
+    background: rgba(0,0,0,.55); color: #fff;
+    font-size: 10px; padding: 1px 6px; border-radius: 2px;
+  }
+  .g-name {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    padding: 14px 6px 4px;
+    background: linear-gradient(transparent, rgba(0,0,0,.8));
+    font-size: 9px; color: #ddd; word-break: break-all; line-height: 1.3;
+  }
+
+  #message { display:none; padding: 60px 32px; color: var(--text-muted); text-align: center; }
+  #message.visible { display:block; }
+
+  #gate {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 16px; padding: 100px 32px; text-align: center;
+  }
+  #gate input {
+    background: var(--surface); border: 1px solid var(--border); color: var(--text);
+    padding: 10px 14px; border-radius: var(--radius); font-family: 'DM Mono', monospace;
+    font-size: 13px; width: 320px; max-width: 90vw; outline: none;
+  }
+  #gate input:focus { border-color: var(--accent); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">emoresz<span>.</span> <span style="color:var(--text-muted);font-size:12px;">— kolejność</span></div>
+  <nav class="top-nav"><a href="index.html">Zdjęcia</a> &nbsp; <a href="videos.html">Filmy</a></nav>
+</header>
+
+<div id="gate">
+  <p style="color:var(--text-muted)">Wklej token administratora, aby edytować kolejność.</p>
+  <input type="password" id="token-input" placeholder="token" autocomplete="off" />
+  <button class="btn primary" id="token-save">Zapisz token</button>
+</div>
+
+<div id="app" style="display:none">
+  <div class="toolbar">
+    <button class="btn" id="sort-newest">Najnowsze</button>
+    <button class="btn" id="sort-oldest">Najstarsze</button>
+    <button class="btn" id="sort-name">Nazwa A–Z</button>
+    <button class="btn" id="sort-size">Rozmiar</button>
+    <div class="toolbar-sep"></div>
+    <button class="btn primary" id="save-btn">💾 Zapisz kolejność</button>
+    <span id="save-status"></span>
+  </div>
+  <div id="gallery"></div>
+  <div id="message"><span id="message-text">Ładowanie…</span></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+<script>
+const BUCKET_URL   = 'https://storage.googleapis.com/emores/';
+const ORIG_PREFIX  = 'emores2/';
+const THUMB_PREFIX = 'thumbs/';
+const ORDER_URL    = BUCKET_URL + 'order.json?ts=' + Date.now();
+const SAVE_ENDPOINT = 'https://save-order-662677831309.europe-central2.run.app';
+const IMAGE_EXT = /\.(jpe?g|png|gif|webp|svg|bmp|tiff?)$/i;
+const VIDEO_EXT = /\.(mp4|mov|webm|mkv|avi|m4v)$/i;
+const THUMB_CACHE_PREFIX = 'emores_vthumb_';
+const THUMB_W = 200;
+const TOKEN_KEY = 'emores_admin_token';
+
+const gate       = document.getElementById('gate');
+const app        = document.getElementById('app');
+const tokenInput = document.getElementById('token-input');
+const gallery    = document.getElementById('gallery');
+const message    = document.getElementById('message');
+const messageTxt = document.getElementById('message-text');
+const saveStatus = document.getElementById('save-status');
+
+let items = [];   // {key, size, lastMod, url, thumbUrl, isVideo, basename}
+
+function getToken() {
+  const url = new URL(location.href);
+  const fromUrl = url.searchParams.get('token');
+  if (fromUrl) { localStorage.setItem(TOKEN_KEY, fromUrl); return fromUrl; }
+  return localStorage.getItem(TOKEN_KEY);
+}
+
+document.getElementById('token-save').addEventListener('click', () => {
+  const t = tokenInput.value.trim();
+  if (!t) return;
+  localStorage.setItem(TOKEN_KEY, t);
+  init();
+});
+
+async function fetchListing() {
+  const res = await fetch(BUCKET_URL, { cache: 'no-store' });
+  if (!res.ok) throw new Error('HTTP '+res.status);
+  const xml = await res.text();
+  const doc = new DOMParser().parseFromString(xml, 'application/xml');
+  const thumbKeys = new Set();
+  doc.querySelectorAll('Contents').forEach(n => {
+    const key = n.querySelector('Key')?.textContent || '';
+    if (key.startsWith(THUMB_PREFIX)) thumbKeys.add(key);
+  });
+  const out = [];
+  doc.querySelectorAll('Contents').forEach(n => {
+    const key = n.querySelector('Key')?.textContent || '';
+    if (!key.startsWith(ORIG_PREFIX)) return;
+    const isImage = IMAGE_EXT.test(key);
+    const isVideo = VIDEO_EXT.test(key);
+    if (!isImage && !isVideo) return;
+
+    const size    = parseInt(n.querySelector('Size')?.textContent||'0');
+    const lastMod = n.querySelector('LastModified')?.textContent||'';
+    const basename = key.split('/').pop();
+    const nameParts = basename.split('.');
+    const ext = nameParts.pop().toLowerCase();
+    const nameNoExt = nameParts.join('.');
+    const thumbKey = THUMB_PREFIX + nameNoExt + '_64x64_thumbnail.' + ext;
+
+    out.push({
+      key, size, lastMod, basename, isVideo,
+      url: BUCKET_URL + key.split('/').map(encodeURIComponent).join('/'),
+      thumbUrl: isImage && thumbKeys.has(thumbKey) ? BUCKET_URL + thumbKey.split('/').map(encodeURIComponent).join('/') : null,
+    });
+  });
+  return out;
+}
+
+async function fetchOrder() {
+  try {
+    const res = await fetch(ORDER_URL, { cache: 'no-store' });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return Array.isArray(data.order) ? data.order : null;
+  } catch { return null; }
+}
+
+function applyOrder(list, order) {
+  if (!order) return list;
+  const rank = new Map(order.map((name,i)=>[name,i]));
+  return [...list].sort((a,b) => {
+    const ra = rank.has(a.basename) ? rank.get(a.basename) : Infinity;
+    const rb = rank.has(b.basename) ? rank.get(b.basename) : Infinity;
+    if (ra !== rb) return ra - rb;
+    return new Date(b.lastMod) - new Date(a.lastMod);
+  });
+}
+
+function thumbCacheKey(it) { return THUMB_CACHE_PREFIX + it.key + '_' + it.size; }
+
+function generateVideoThumb(it, imgEl, fallbackEl) {
+  const cacheKey = thumbCacheKey(it);
+  try {
+    const cached = localStorage.getItem(cacheKey);
+    if (cached) { imgEl.src = cached; imgEl.style.display=''; fallbackEl.style.display='none'; return; }
+  } catch {}
+  const v = document.createElement('video');
+  v.crossOrigin = 'anonymous'; v.muted = true; v.playsInline = true; v.preload = 'metadata';
+  v.src = it.url;
+  const cleanup = () => { v.src=''; v.remove(); };
+  v.addEventListener('loadedmetadata', () => { v.currentTime = Math.min(1, (v.duration||2)/2); });
+  v.addEventListener('seeked', () => {
+    try {
+      const canvas = document.createElement('canvas');
+      const scale = THUMB_W / v.videoWidth;
+      canvas.width = THUMB_W; canvas.height = Math.round(v.videoHeight*scale);
+      canvas.getContext('2d').drawImage(v, 0, 0, canvas.width, canvas.height);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+      imgEl.src = dataUrl; imgEl.style.display=''; fallbackEl.style.display='none';
+      try { localStorage.setItem(cacheKey, dataUrl); } catch {}
+    } catch {}
+    cleanup();
+  });
+  v.addEventListener('error', cleanup);
+  document.body.appendChild(v);
+  v.style.display = 'none';
+}
+
+function render() {
+  gallery.innerHTML = '';
+  if (!items.length) {
+    messageTxt.textContent = 'Brak plików w buckecie.';
+    message.classList.add('visible');
+    return;
+  }
+  message.classList.remove('visible');
+
+  items.forEach(it => {
+    const el = document.createElement('div');
+    el.className = 'g-item';
+    el.dataset.basename = it.basename;
+    el.innerHTML = `
+      <img style="display:none" alt="${it.basename}" />
+      <div class="thumb-fallback">${it.isVideo ? '▶' : '…'}</div>
+      ${it.isVideo ? '<span class="g-video-tag">wideo</span>' : ''}
+      <div class="g-name">${it.basename}</div>`;
+    const imgEl = el.querySelector('img');
+    const fallbackEl = el.querySelector('.thumb-fallback');
+    if (it.isVideo) {
+      generateVideoThumb(it, imgEl, fallbackEl);
+    } else if (it.thumbUrl) {
+      imgEl.src = it.thumbUrl;
+      imgEl.style.display = '';
+      fallbackEl.style.display = 'none';
+      imgEl.addEventListener('error', () => { imgEl.src = it.url; });
+    } else {
+      imgEl.src = it.url;
+      imgEl.style.display = '';
+      fallbackEl.style.display = 'none';
+    }
+    gallery.appendChild(el);
+  });
+}
+
+function currentOrderFromDom() {
+  return [...gallery.children].map(el => el.dataset.basename);
+}
+
+function sortBy(fn) {
+  items.sort(fn);
+  render();
+}
+document.getElementById('sort-newest').addEventListener('click', () => sortBy((a,b)=>new Date(b.lastMod)-new Date(a.lastMod)));
+document.getElementById('sort-oldest').addEventListener('click', () => sortBy((a,b)=>new Date(a.lastMod)-new Date(b.lastMod)));
+document.getElementById('sort-name').addEventListener('click',   () => sortBy((a,b)=>a.basename.localeCompare(b.basename)));
+document.getElementById('sort-size').addEventListener('click',   () => sortBy((a,b)=>b.size-a.size));
+
+document.getElementById('save-btn').addEventListener('click', async () => {
+  const token = getToken();
+  if (!token) { showGate(); return; }
+  saveStatus.textContent = 'zapisywanie…';
+  saveStatus.className = '';
+  try {
+    const res = await fetch(SAVE_ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ order: currentOrderFromDom(), mode: 'manual' }),
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    saveStatus.textContent = 'zapisano ✓';
+    saveStatus.className = 'ok';
+  } catch (err) {
+    saveStatus.textContent = 'błąd zapisu';
+    saveStatus.className = 'err';
+    console.error('[emores-admin]', err);
+  }
+});
+
+function showGate() {
+  gate.style.display = 'flex';
+  app.style.display = 'none';
+}
+
+async function init() {
+  const token = getToken();
+  if (!token) { showGate(); return; }
+  gate.style.display = 'none';
+  app.style.display = 'block';
+
+  try {
+    const [listing, order] = await Promise.all([fetchListing(), fetchOrder()]);
+    items = applyOrder(listing, order);
+    render();
+    new Sortable(gallery, { animation: 150, ghostClass: 'sortable-ghost', chosenClass: 'sortable-chosen' });
+  } catch (err) {
+    messageTxt.textContent = 'Nie można pobrać listy plików.';
+    message.classList.add('visible');
+    console.error('[emores-admin]', err);
+  }
+}
+
+init();
+</script>
+</body>
+</html>

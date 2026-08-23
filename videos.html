@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Emores — Filmy</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Playfair+Display:wght@700&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0c0c0e;
+    --surface: #141416;
+    --border: rgba(255,255,255,0.08);
+    --accent: #d4a853;
+    --accent-dim: rgba(212,168,83,0.15);
+    --text: #f0ede6;
+    --text-muted: #7a7870;
+    --text-dim: #444240;
+    --radius: 4px;
+  }
+
+  html, body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    min-height: 100vh;
+  }
+
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 24px 32px 20px;
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    background: var(--bg);
+    z-index: 10;
+  }
+  .logo { font-family: 'Playfair Display', serif; font-size: 22px; color: var(--text); }
+  .logo span { color: var(--accent); }
+
+  .top-nav { display: flex; align-items: center; gap: 18px; }
+  .top-nav a {
+    color: var(--text-muted); text-decoration: none;
+    font-size: 12px; letter-spacing: .06em; text-transform: uppercase;
+    transition: color .2s;
+  }
+  .top-nav a:hover { color: var(--accent); }
+
+  .header-right { display: flex; align-items: center; gap: 16px; }
+  .btn {
+    background: none; border: 1px solid var(--border);
+    color: var(--text-muted); padding: 6px 14px;
+    border-radius: var(--radius); cursor: pointer;
+    font-family: 'DM Mono', monospace; font-size: 11px;
+    letter-spacing: .05em; transition: all .2s;
+  }
+  .btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  .filter-bar {
+    display: flex; align-items: center; gap: 12px;
+    padding: 14px 32px; border-bottom: 1px solid var(--border);
+  }
+  .filter-label { color: var(--text-muted); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; }
+  #search-input {
+    background: var(--surface); border: 1px solid var(--border);
+    color: var(--text); padding: 6px 12px; border-radius: var(--radius);
+    font-family: 'DM Mono', monospace; font-size: 12px; width: 220px;
+    outline: none; transition: border-color .2s;
+  }
+  #search-input:focus { border-color: var(--accent); }
+  #search-input::placeholder { color: var(--text-dim); }
+
+  .sort-select {
+    background: var(--surface); border: 1px solid var(--border);
+    color: var(--text); padding: 6px 12px; border-radius: var(--radius);
+    font-family: 'DM Mono', monospace; font-size: 12px;
+    cursor: pointer; outline: none; transition: border-color .2s;
+  }
+  .sort-select:focus { border-color: var(--accent); }
+
+  #gallery {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 3px;
+    padding: 18px 32px 40px;
+  }
+  @media (max-width: 900px) { #gallery { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 600px) { #gallery { grid-template-columns: repeat(2, 1fr); padding: 12px 8px 32px; gap: 2px; } }
+
+  .vid-item {
+    position: relative;
+    aspect-ratio: 3 / 2;
+    overflow: hidden;
+    background: var(--surface);
+    cursor: pointer;
+    transition: transform .18s;
+  }
+  .vid-item:hover { transform: scale(1.02); z-index: 2; }
+  .vid-item img, .vid-item .thumb-fallback {
+    width: 100%; height: 100%; object-fit: cover; display: block;
+  }
+  .thumb-fallback {
+    display: flex; align-items: center; justify-content: center;
+    color: var(--text-dim); font-size: 11px;
+  }
+  .play-badge {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+    width: 40px; height: 40px; border-radius: 50%;
+    background: rgba(0,0,0,.45); border: 1px solid rgba(255,255,255,.3);
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 14px; pointer-events: none;
+  }
+  .vid-overlay {
+    position: absolute; bottom:0; left:0; right:0;
+    padding: 28px 10px 8px;
+    background: linear-gradient(transparent, rgba(0,0,0,.75));
+    font-size: 10px; color: #eee; word-break: break-all; line-height: 1.4;
+  }
+
+  #message {
+    display:none; flex-direction:column; align-items:center;
+    gap:12px; padding:80px 32px; color:var(--text-muted);
+    font-size:13px; text-align:center;
+  }
+  #message.visible { display:flex; }
+
+  #player {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.94);
+    z-index: 200;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+  #player.open { display: flex; }
+  #pl-toolbar {
+    position: fixed; top: 0; left: 0; right: 0;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 20px;
+    background: linear-gradient(rgba(0,0,0,.7), transparent);
+    z-index: 210; gap: 12px;
+  }
+  #pl-name {
+    color: var(--text-muted); font-size: 12px; letter-spacing: .04em; flex: 1;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .pl-btn {
+    background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.12);
+    color: var(--text); width: 36px; height: 36px;
+    border-radius: var(--radius); cursor: pointer;
+    font-size: 18px; line-height: 1;
+    display: flex; align-items: center; justify-content: center;
+    transition: background .15s; flex-shrink: 0;
+  }
+  .pl-btn:hover { background: rgba(255,255,255,.12); }
+  #pl-video { max-width: 94vw; max-height: 80vh; background: #000; }
+  .pl-arrow {
+    position: fixed; top: 50%; transform: translateY(-50%);
+    background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.1);
+    color: var(--text); width: 44px; height: 44px;
+    border-radius: var(--radius); cursor: pointer;
+    font-size: 20px; line-height: 1;
+    display: flex; align-items: center; justify-content: center;
+    z-index: 210;
+  }
+  .pl-arrow:hover { background: rgba(255,255,255,.14); }
+  .pl-arrow.hidden { opacity: 0; pointer-events: none; }
+  #pl-prev { left: 12px; }
+  #pl-next { right: 12px; }
+  #pl-counter {
+    position: fixed; bottom: 16px; left: 0; right: 0; text-align: center;
+    color: var(--text-muted); font-size: 11px; z-index: 210;
+  }
+
+  @media (max-width: 600px) {
+    header { padding: 16px 16px 14px; }
+    .filter-bar { padding: 10px 16px; flex-wrap: wrap; }
+    .pl-arrow { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">emoresz<span>.</span></div>
+  <nav class="top-nav"><a href="index.html">Zdjęcia</a></nav>
+  <div class="header-right">
+    <button class="btn" id="refresh-btn">↺ odśwież</button>
+  </div>
+</header>
+
+<div class="filter-bar">
+  <span class="filter-label">Filtr</span>
+  <input type="text" id="search-input" placeholder="szukaj po nazwie…" />
+  <select class="sort-select" id="sort-select">
+    <option value="newest">Najnowsze</option>
+    <option value="oldest">Najstarsze</option>
+    <option value="name">Nazwa A–Z</option>
+    <option value="size">Rozmiar</option>
+    <option value="custom">Kolejność własna</option>
+  </select>
+</div>
+
+<div id="gallery"></div>
+<div id="message"><span id="message-text">Ładowanie…</span></div>
+
+<div id="player" role="dialog" aria-modal="true" aria-label="Odtwarzacz wideo">
+  <div id="pl-toolbar">
+    <span id="pl-name"></span>
+    <button class="pl-btn" id="pl-close" title="Zamknij (Esc)">✕</button>
+  </div>
+  <video id="pl-video" controls playsinline></video>
+  <button class="pl-arrow" id="pl-prev">‹</button>
+  <button class="pl-arrow" id="pl-next">›</button>
+  <div id="pl-counter"></div>
+</div>
+
+<script>
+const BUCKET_URL  = 'https://storage.googleapis.com/emores/';
+const ORIG_PREFIX = 'emores2/';
+const ORDER_URL   = BUCKET_URL + 'order.json?ts=' + Date.now();
+const VIDEO_EXT   = /\.(mp4|mov|webm|mkv|avi|m4v)$/i;
+const THUMB_CACHE_PREFIX = 'emores_vthumb_';
+const THUMB_W = 320;
+
+let allVideos     = [];
+let visibleVideos = [];
+let customOrder   = null;
+let plIndex       = 0;
+
+const gallery      = document.getElementById('gallery');
+const searchInput  = document.getElementById('search-input');
+const sortSelect   = document.getElementById('sort-select');
+const message      = document.getElementById('message');
+const messageTxt   = document.getElementById('message-text');
+
+const player    = document.getElementById('player');
+const plVideo   = document.getElementById('pl-video');
+const plName    = document.getElementById('pl-name');
+const plCounter = document.getElementById('pl-counter');
+const plPrev    = document.getElementById('pl-prev');
+const plNext    = document.getElementById('pl-next');
+
+const fmtSize = b => b < 1024 ? b+'B' : b < 1048576 ? (b/1024).toFixed(1)+'KB' : (b/1048576).toFixed(1)+'MB';
+const fmtTime = iso => { const d=new Date(iso); return d.toLocaleDateString('pl-PL')+' '+d.toLocaleTimeString('pl-PL',{hour:'2-digit',minute:'2-digit'}); };
+
+async function fetchOrder() {
+  try {
+    const res = await fetch(ORDER_URL, { cache: 'no-store' });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return Array.isArray(data.order) ? data.order : null;
+  } catch { return null; }
+}
+
+async function fetchListing() {
+  const res = await fetch(BUCKET_URL, { cache: 'no-store' });
+  if (!res.ok) throw new Error('HTTP '+res.status);
+  const xml = await res.text();
+  const doc = new DOMParser().parseFromString(xml, 'application/xml');
+  const items = [];
+  doc.querySelectorAll('Contents').forEach(n => {
+    const key = n.querySelector('Key')?.textContent || '';
+    if (!(key.startsWith(ORIG_PREFIX) && VIDEO_EXT.test(key))) return;
+    const size    = parseInt(n.querySelector('Size')?.textContent||'0');
+    const lastMod = n.querySelector('LastModified')?.textContent||'';
+    items.push({
+      key, size, lastMod,
+      url: BUCKET_URL + key.split('/').map(encodeURIComponent).join('/'),
+    });
+  });
+  return items;
+}
+
+function applyFiltersAndSort(vids) {
+  const q  = searchInput.value.trim().toLowerCase();
+  const by = sortSelect.value;
+  let arr  = q ? vids.filter(v => v.key.toLowerCase().includes(q)) : [...vids];
+  if (by==='newest') arr.sort((a,b)=>new Date(b.lastMod)-new Date(a.lastMod));
+  else if (by==='oldest') arr.sort((a,b)=>new Date(a.lastMod)-new Date(b.lastMod));
+  else if (by==='name')   arr.sort((a,b)=>a.key.localeCompare(b.key));
+  else if (by==='size')   arr.sort((a,b)=>b.size-a.size);
+  else if (by==='custom' && customOrder) {
+    const rank = new Map(customOrder.map((name,i)=>[name,i]));
+    arr.sort((a,b) => {
+      const an = a.key.split('/').pop(), bn = b.key.split('/').pop();
+      const ra = rank.has(an) ? rank.get(an) : Infinity;
+      const rb = rank.has(bn) ? rank.get(bn) : Infinity;
+      if (ra !== rb) return ra - rb;
+      return new Date(b.lastMod) - new Date(a.lastMod);
+    });
+  }
+  return arr;
+}
+
+function thumbCacheKey(vid) { return THUMB_CACHE_PREFIX + vid.key + '_' + vid.size; }
+
+function generateThumb(vid, imgEl, fallbackEl) {
+  const cacheKey = thumbCacheKey(vid);
+  try {
+    const cached = localStorage.getItem(cacheKey);
+    if (cached) { imgEl.src = cached; imgEl.style.display = ''; fallbackEl.style.display = 'none'; return; }
+  } catch {}
+
+  const v = document.createElement('video');
+  v.crossOrigin = 'anonymous';
+  v.muted = true;
+  v.playsInline = true;
+  v.preload = 'metadata';
+  v.src = vid.url;
+
+  const cleanup = () => { v.src = ''; v.remove(); };
+
+  v.addEventListener('loadedmetadata', () => {
+    v.currentTime = Math.min(1, (v.duration || 2) / 2);
+  });
+  v.addEventListener('seeked', () => {
+    try {
+      const canvas = document.createElement('canvas');
+      const scale = THUMB_W / v.videoWidth;
+      canvas.width = THUMB_W;
+      canvas.height = Math.round(v.videoHeight * scale);
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(v, 0, 0, canvas.width, canvas.height);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+      imgEl.src = dataUrl;
+      imgEl.style.display = '';
+      fallbackEl.style.display = 'none';
+      try { localStorage.setItem(cacheKey, dataUrl); } catch {}
+    } catch (e) { /* CORS-tainted canvas or decode error — keep fallback */ }
+    cleanup();
+  });
+  v.addEventListener('error', cleanup);
+  document.body.appendChild(v);
+  v.style.display = 'none';
+}
+
+function renderGallery() {
+  visibleVideos = applyFiltersAndSort(allVideos);
+  gallery.innerHTML = '';
+
+  if (!visibleVideos.length) {
+    messageTxt.textContent = searchInput.value ? 'Brak wyników.' : 'Brak filmów w buckecie.';
+    message.classList.add('visible');
+    return;
+  }
+  message.classList.remove('visible');
+
+  visibleVideos.forEach((vid, idx) => {
+    const item = document.createElement('div');
+    item.className = 'vid-item';
+    item.innerHTML = `
+      <img style="display:none" alt="${vid.key}" />
+      <div class="thumb-fallback">▶ film</div>
+      <div class="play-badge">▶</div>
+      <div class="vid-overlay">${vid.key.split('/').pop()}<br>${fmtSize(vid.size)} · ${fmtTime(vid.lastMod)}</div>`;
+    const imgEl = item.querySelector('img');
+    const fallbackEl = item.querySelector('.thumb-fallback');
+    generateThumb(vid, imgEl, fallbackEl);
+    item.addEventListener('click', () => openPlayer(idx));
+    gallery.appendChild(item);
+  });
+}
+
+function openPlayer(idx) {
+  plIndex = idx;
+  player.classList.add('open');
+  loadPlayerVideo();
+}
+function closePlayer() {
+  player.classList.remove('open');
+  plVideo.pause();
+  plVideo.src = '';
+}
+function loadPlayerVideo() {
+  const vid = visibleVideos[plIndex];
+  if (!vid) return;
+  plName.textContent = vid.key.split('/').pop();
+  plCounter.textContent = `${plIndex+1} / ${visibleVideos.length}`;
+  plPrev.classList.toggle('hidden', plIndex===0);
+  plNext.classList.toggle('hidden', plIndex===visibleVideos.length-1);
+  plVideo.src = vid.url;
+  plVideo.play().catch(()=>{});
+}
+function navigate(dir) {
+  const next = plIndex + dir;
+  if (next < 0 || next >= visibleVideos.length) return;
+  plIndex = next;
+  loadPlayerVideo();
+}
+
+document.getElementById('pl-close').addEventListener('click', closePlayer);
+plPrev.addEventListener('click', () => navigate(-1));
+plNext.addEventListener('click', () => navigate(1));
+player.addEventListener('click', e => { if (e.target === player) closePlayer(); });
+document.addEventListener('keydown', e => {
+  if (!player.classList.contains('open')) return;
+  if (e.key==='Escape') closePlayer();
+  else if (e.key==='ArrowLeft') navigate(-1);
+  else if (e.key==='ArrowRight') navigate(1);
+});
+
+document.getElementById('refresh-btn').addEventListener('click', load);
+searchInput.addEventListener('input', renderGallery);
+sortSelect.addEventListener('change', renderGallery);
+
+async function load() {
+  try {
+    allVideos = await fetchListing();
+    customOrder = await fetchOrder();
+    if (customOrder) sortSelect.value = 'custom';
+    renderGallery();
+  } catch (err) {
+    messageTxt.textContent = 'Nie można pobrać listy filmów.';
+    message.classList.add('visible');
+    console.error('[emores-videos]', err);
+  }
+}
+
+load();
+</script>
+</body>
+</html>

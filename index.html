@@ -57,6 +57,14 @@
   }
   .logo span { color: var(--accent); }
 
+  .top-nav { display: flex; align-items: center; gap: 18px; }
+  .top-nav a {
+    color: var(--text-muted); text-decoration: none;
+    font-size: 12px; letter-spacing: .06em; text-transform: uppercase;
+    transition: color .2s;
+  }
+  .top-nav a:hover { color: var(--accent); }
+
   .header-right { display: flex; align-items: center; gap: 16px; }
 
   #status-dot {
@@ -352,6 +360,7 @@
 
 <header>
   <div class="logo">emoresz<span>.</span></div>
+  <nav class="top-nav"><a href="videos.html">Filmy</a></nav>
   <div class="header-right">
     <div id="status-dot" class="loading"></div>
     <span id="status-text">łączenie…</span>
@@ -386,6 +395,7 @@
     <option value="oldest">Najstarsze</option>
     <option value="name">Nazwa A–Z</option>
     <option value="size">Rozmiar</option>
+    <option value="custom">Kolejność własna</option>
   </select>
 </div>
 
@@ -430,6 +440,7 @@
 const BUCKET_URL   = 'https://storage.googleapis.com/emores/';
 const ORIG_PREFIX  = 'emores2/';            // oryginały w root
 const THUMB_PREFIX = 'thumbs/';     // miniatury w tym folderze
+const ORDER_URL    = BUCKET_URL + 'order.json?ts=' + Date.now();
 const PAGE_SIZE    = 10;             // ile zdjęć wczytać na raz
 const REFRESH_SEC  = 5;
 const ZOOM_STEP    = 0.25;
@@ -448,6 +459,7 @@ let pendingNew    = [];
 let countdown     = REFRESH_SEC;
 let countdownTimer = null;
 let initialized   = false;
+let customOrder   = null;   // tablica nazw plików (basename) z order.json, wg admin.html
 
 // Lightbox state
 let lbIndex  = 0;
@@ -575,6 +587,16 @@ function applyFiltersAndSort(imgs) {
   else if (by==='oldest') arr.sort((a,b)=>new Date(a.lastMod)-new Date(b.lastMod));
   else if (by==='name')   arr.sort((a,b)=>a.key.localeCompare(b.key));
   else if (by==='size')   arr.sort((a,b)=>b.size-a.size);
+  else if (by==='custom' && customOrder) {
+    const rank = new Map(customOrder.map((name,i)=>[name,i]));
+    arr.sort((a,b) => {
+      const an = a.key.split('/').pop(), bn = b.key.split('/').pop();
+      const ra = rank.has(an) ? rank.get(an) : Infinity;
+      const rb = rank.has(bn) ? rank.get(bn) : Infinity;
+      if (ra !== rb) return ra - rb;
+      return new Date(b.lastMod) - new Date(a.lastMod);
+    });
+  }
   return arr;
 }
 
@@ -656,9 +678,22 @@ loadMoreWrap.style.display = 'none';
 // ══════════════════════════════════════════════════════════════
 //  LOAD DATA
 // ══════════════════════════════════════════════════════════════
+async function fetchOrder() {
+  try {
+    const res = await fetch(ORDER_URL, { cache: 'no-store' });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return Array.isArray(data.order) ? data.order : null;
+  } catch { return null; }
+}
+
 async function load(isInitial=false) {
   try {
     const imgs = await fetchListing();
+    if (isInitial) {
+      customOrder = await fetchOrder();
+      if (customOrder) sortSelect.value = 'custom';
+    }
     const newKeys = new Set();
     if (!isInitial && knownKeys.size>0)
       imgs.forEach(i => { if (!knownKeys.has(i.key)) newKeys.add(i.key); });
