@@ -81,6 +81,27 @@
   #message { display:none; padding: 60px 32px; color: var(--text-muted); text-align: center; }
   #message.visible { display:block; }
 
+  #texts-panel { padding: 4px 32px 40px; display: flex; flex-direction: column; gap: 16px; }
+  .text-box {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 14px 16px;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .text-box-label { font-size: 12px; color: var(--accent); letter-spacing: .04em; }
+  .text-box-meta { font-size: 10px; color: var(--text-dim); }
+  .text-box textarea {
+    background: var(--bg); border: 1px solid var(--border); color: var(--text);
+    padding: 10px 12px; border-radius: var(--radius);
+    font-family: 'DM Mono', monospace; font-size: 12px; line-height: 1.5;
+    resize: vertical; min-height: 70px; outline: none;
+  }
+  .text-box textarea:focus { border-color: var(--accent); }
+  .text-box-row { display: flex; align-items: center; gap: 10px; }
+  .text-box-status { font-size: 11px; color: var(--text-muted); }
+  .text-box-status.ok { color: #8fd18f; }
+  .text-box-status.err { color: #e24b4a; }
+  #texts-empty { color: var(--text-muted); font-size: 12px; padding: 8px 0; }
+
   #gate {
     display: flex; flex-direction: column; align-items: center; justify-content: center;
     gap: 16px; padding: 100px 32px; text-align: center;
@@ -115,9 +136,18 @@
     <div class="toolbar-sep"></div>
     <button class="btn primary" id="save-btn">💾 Zapisz kolejność</button>
     <span id="save-status"></span>
+    <div class="toolbar-sep"></div>
+    <button class="btn" id="clear-orphans-btn">🧹 Wyczyść osierocone miniatury</button>
+    <span id="orphan-status"></span>
   </div>
   <div id="gallery"></div>
   <div id="message"><span id="message-text">Ładowanie…</span></div>
+
+  <div class="toolbar" style="border-top: 1px solid var(--border); margin-top: 8px;">
+    <span style="color:var(--text-muted); letter-spacing:.06em; text-transform:uppercase; font-size:11px;">Teksty na stronie</span>
+    <button class="btn" id="texts-reload-btn">↺ odśwież listę</button>
+  </div>
+  <div id="texts-panel"></div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
@@ -126,7 +156,11 @@ const BUCKET_URL   = 'https://storage.googleapis.com/emores/';
 const ORIG_PREFIX  = 'emores2/';
 const THUMB_PREFIX = 'thumbs/';
 const ORDER_URL    = BUCKET_URL + 'order.json?ts=' + Date.now();
-const SAVE_ENDPOINT = 'https://save-order-662677831309.europe-central2.run.app';
+const API_BASE = 'https://save-order-662677831309.europe-central2.run.app';
+const SAVE_ENDPOINT = API_BASE + '/save-order';
+const CLEAR_ORPHANS_ENDPOINT = API_BASE + '/clear-orphans';
+const SAVE_TEXTS_ENDPOINT = API_BASE + '/save-texts';
+const TEXT_SCAN_PAGES = ['index.html', 'videos.html'];
 const IMAGE_EXT = /\.(jpe?g|png|gif|webp|svg|bmp|tiff?)$/i;
 const VIDEO_EXT = /\.(mp4|mov|webm|mkv|avi|m4v)$/i;
 const THUMB_CACHE_PREFIX = 'emores_vthumb_';
@@ -312,6 +346,123 @@ document.getElementById('save-btn').addEventListener('click', async () => {
   }
 });
 
+document.getElementById('clear-orphans-btn').addEventListener('click', async () => {
+  const token = getToken();
+  if (!token) { showGate(); return; }
+  const status = document.getElementById('orphan-status');
+  if (!confirm('Usunąć wszystkie osierocone miniatury (bez odpowiadającego oryginału)? Tej operacji nie można cofnąć.')) return;
+  status.textContent = 'czyszczenie…';
+  status.className = '';
+  try {
+    const res = await fetch(CLEAR_ORPHANS_ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: '{}',
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    status.textContent = `usunięto ${data.deleted} ✓`;
+    status.className = 'ok';
+  } catch (err) {
+    status.textContent = 'błąd czyszczenia';
+    status.className = 'err';
+    console.error('[emores-admin]', err);
+  }
+});
+
+// ══════════════════════════════════════════════════════════════
+//  TEXT BOXES — scan live pages for [data-text-id], edit, save
+// ══════════════════════════════════════════════════════════════
+async function scanTextBoxes() {
+  const found = [];
+  const seen = new Set();
+  for (const page of TEXT_SCAN_PAGES) {
+    try {
+      const res = await fetch(BUCKET_URL + page + '?ts=' + Date.now(), { cache: 'no-store' });
+      if (!res.ok) continue;
+      const html = await res.text();
+      const doc = new DOMParser().parseFromString(html, 'text/html');
+      doc.querySelectorAll('[data-text-id]').forEach(el => {
+        const id = el.dataset.textId;
+        if (!id || seen.has(id)) return;
+        seen.add(id);
+        found.push({
+          id,
+          label: el.dataset.textLabel || id,
+          page,
+          defaultText: el.textContent.trim(),
+        });
+      });
+    } catch (e) { console.error('[emores-admin] scan', page, e); }
+  }
+  return found;
+}
+
+async function fetchTexts() {
+  try {
+    const res = await fetch(BUCKET_URL + 'texts.json?ts=' + Date.now(), { cache: 'no-store' });
+    if (!res.ok) return {};
+    const data = await res.json();
+    return data.texts || {};
+  } catch { return {}; }
+}
+
+async function loadTextsPanel() {
+  const panel = document.getElementById('texts-panel');
+  panel.innerHTML = '<div id="texts-empty">Skanowanie stron…</div>';
+  const [boxes, saved] = await Promise.all([scanTextBoxes(), fetchTexts()]);
+  panel.innerHTML = '';
+
+  if (!boxes.length) {
+    panel.innerHTML = '<div id="texts-empty">Nie znaleziono żadnych textboxów (elementów z data-text-id).</div>';
+    return;
+  }
+
+  boxes.forEach(box => {
+    const current = saved[box.id] !== undefined ? saved[box.id] : box.defaultText;
+    const el = document.createElement('div');
+    el.className = 'text-box';
+    el.innerHTML = `
+      <div class="text-box-label"></div>
+      <div class="text-box-meta"></div>
+      <div class="text-box-row">
+        <button class="btn primary">💾 Zapisz tekst</button>
+        <span class="text-box-status"></span>
+      </div>`;
+    el.querySelector('.text-box-label').textContent = box.label;
+    el.querySelector('.text-box-meta').textContent =
+      `id: ${box.id} · strona: ${box.page}` + (saved[box.id] === undefined ? ' · (domyślny tekst, jeszcze nie zapisany)' : '');
+    const textarea = document.createElement('textarea');
+    textarea.value = current;
+    el.insertBefore(textarea, el.querySelector('.text-box-row'));
+    const saveBtn = el.querySelector('button');
+    const status = el.querySelector('.text-box-status');
+    saveBtn.addEventListener('click', async () => {
+      const token = getToken();
+      if (!token) { showGate(); return; }
+      status.textContent = 'zapisywanie…';
+      status.className = 'text-box-status';
+      try {
+        const res = await fetch(SAVE_TEXTS_ENDPOINT, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+          body: JSON.stringify({ texts: { [box.id]: textarea.value } }),
+        });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        status.textContent = 'zapisano ✓';
+        status.className = 'text-box-status ok';
+      } catch (err) {
+        status.textContent = 'błąd zapisu';
+        status.className = 'text-box-status err';
+        console.error('[emores-admin]', err);
+      }
+    });
+    panel.appendChild(el);
+  });
+}
+
+document.getElementById('texts-reload-btn').addEventListener('click', loadTextsPanel);
+
 function showGate() {
   gate.style.display = 'flex';
   app.style.display = 'none';
@@ -328,6 +479,7 @@ async function init() {
     items = applyOrder(listing, order);
     render();
     new Sortable(gallery, { animation: 150, ghostClass: 'sortable-ghost', chosenClass: 'sortable-chosen' });
+    loadTextsPanel();
   } catch (err) {
     messageTxt.textContent = 'Nie można pobrać listy plików.';
     message.classList.add('visible');

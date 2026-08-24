@@ -12,7 +12,7 @@
 </script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>Emores Gallery</title>
+<title>Gdański Kżyż</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Playfair+Display:wght@700&display=swap');
 
@@ -102,16 +102,6 @@
     display: flex; align-items: center; gap: 12px;
     padding: 14px 32px; border-bottom: 1px solid var(--border);
   }
-  .filter-label { color: var(--text-muted); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; }
-  #search-input {
-    background: var(--surface); border: 1px solid var(--border);
-    color: var(--text); padding: 6px 12px; border-radius: var(--radius);
-    font-family: 'DM Mono', monospace; font-size: 12px; width: 220px;
-    outline: none; transition: border-color .2s;
-  }
-  #search-input:focus { border-color: var(--accent); }
-  #search-input::placeholder { color: var(--text-dim); }
-
   .sort-select {
     background: var(--surface); border: 1px solid var(--border);
     color: var(--text); padding: 6px 12px; border-radius: var(--radius);
@@ -119,6 +109,13 @@
     cursor: pointer; outline: none; transition: border-color .2s;
   }
   .sort-select:focus { border-color: var(--accent); }
+
+  /* ── Site text (editable via admin.html) ── */
+  .site-text {
+    padding: 14px 32px; border-bottom: 1px solid var(--border);
+    color: var(--text-muted); font-size: 12px; line-height: 1.6;
+    white-space: pre-line;
+  }
 
   /* ── New banner ── */
   #new-banner {
@@ -181,6 +178,26 @@
     font-size: 9px; font-weight: 500; letter-spacing: .1em;
     padding: 2px 6px; border-radius: 2px;
   }
+
+  .heart-btn {
+    position: absolute; top: 6px; left: 6px; z-index: 3;
+    display: flex; align-items: center; gap: 4px;
+    background: rgba(0,0,0,.35); border: none;
+    border-radius: 12px; padding: 4px 8px;
+    cursor: pointer; -webkit-tap-highlight-color: transparent;
+    transition: background .15s;
+  }
+  .heart-btn:hover { background: rgba(0,0,0,.55); }
+  .heart-btn svg { width: 15px; height: 15px; display: block; }
+  .heart-btn path {
+    fill: rgba(255,255,255,0.08); stroke: rgba(255,255,255,0.85);
+    stroke-width: 1.6; transition: fill .15s, stroke .15s;
+  }
+  .heart-btn.liked path { fill: #e2555a; stroke: #e2555a; }
+  .heart-count {
+    color: #f0ede6; font-size: 10px; min-width: 8px; text-align: left;
+  }
+  .heart-count:empty { display: none; }
 
   .img-item img {
     width: 100%; height: 100%; object-fit: cover; display: block;
@@ -359,7 +376,7 @@
 <body>
 
 <header>
-  <div class="logo">emoresz<span>.</span></div>
+  <div class="logo">Gdański Kżyż<span>.</span></div>
   <nav class="top-nav"><a href="videos.html">Filmy</a></nav>
   <div class="header-right">
     <div id="status-dot" class="loading"></div>
@@ -388,16 +405,17 @@
 </div>
 
 <div class="filter-bar">
-  <span class="filter-label">Filtr</span>
-  <input type="text" id="search-input" placeholder="szukaj po nazwie…" />
   <select class="sort-select" id="sort-select">
     <option value="newest">Najnowsze</option>
     <option value="oldest">Najstarsze</option>
     <option value="name">Nazwa A–Z</option>
     <option value="size">Rozmiar</option>
-    <option value="custom">Kolejność własna</option>
   </select>
 </div>
+
+<div class="site-text" data-text-id="welcome" data-text-label="Baner powitalny (strona główna)">Witaj na Gdański Krzyż, nowej (lepszej) platformie, gdzie momenty są dzielone z innymi błyskawicznie, a zdjęcia są najwyższej jakości.
+
+Dołącz do projektu, zasubskrybuj!</div>
 
 <div id="cors-hint"></div>
 <div id="new-banner"><span class="new-dot"></span><span id="new-banner-text"></span></div>
@@ -441,6 +459,9 @@ const BUCKET_URL   = 'https://storage.googleapis.com/emores/';
 const ORIG_PREFIX  = 'emores2/';            // oryginały w root
 const THUMB_PREFIX = 'thumbs/';     // miniatury w tym folderze
 const ORDER_URL    = BUCKET_URL + 'order.json?ts=' + Date.now();
+const TEXTS_URL    = BUCKET_URL + 'texts.json?ts=' + Date.now();
+const LIKES_URL    = BUCKET_URL + 'likes.json?ts=' + Date.now();
+const LIKE_ENDPOINT = 'https://save-order-662677831309.europe-central2.run.app/like';
 const PAGE_SIZE    = 10;             // ile zdjęć wczytać na raz
 const REFRESH_SEC  = 5;
 const ZOOM_STEP    = 0.25;
@@ -460,6 +481,9 @@ let countdown     = REFRESH_SEC;
 let countdownTimer = null;
 let initialized   = false;
 let customOrder   = null;   // tablica nazw plików (basename) z order.json, wg admin.html
+let usingDefaultOrder = true; // dopóki użytkownik nie zmieni sortowania, stosuj customOrder w tle
+let likeCounts    = {};     // { basename: count }
+let likedByMe     = new Set(); // basename polubione w tej przeglądarce (localStorage)
 
 // Lightbox state
 let lbIndex  = 0;
@@ -488,7 +512,6 @@ const totalCount    = document.getElementById('total-count');
 const newCount      = document.getElementById('new-count');
 const lastRefresh   = document.getElementById('last-refresh');
 const nextRefresh   = document.getElementById('next-refresh');
-const searchInput   = document.getElementById('search-input');
 const sortSelect    = document.getElementById('sort-select');
 const newBanner     = document.getElementById('new-banner');
 const newBannerTxt  = document.getElementById('new-banner-text');
@@ -579,24 +602,27 @@ function parseXML(xml) {
 // ══════════════════════════════════════════════════════════════
 //  RENDER GALLERY z lazy loading (PAGE_SIZE na raz)
 // ══════════════════════════════════════════════════════════════
+function sortByCustomOrder(arr) {
+  const rank = new Map(customOrder.map((name,i)=>[name,i]));
+  return [...arr].sort((a,b) => {
+    const an = a.key.split('/').pop(), bn = b.key.split('/').pop();
+    const ra = rank.has(an) ? rank.get(an) : Infinity;
+    const rb = rank.has(bn) ? rank.get(bn) : Infinity;
+    if (ra !== rb) return ra - rb;
+    return new Date(b.lastMod) - new Date(a.lastMod);
+  });
+}
+
 function applyFiltersAndSort(imgs) {
-  const q  = searchInput.value.trim().toLowerCase();
   const by = sortSelect.value;
-  let arr  = q ? imgs.filter(i => i.key.toLowerCase().includes(q)) : [...imgs];
+  let arr = [...imgs];
+
+  if (usingDefaultOrder && customOrder) return sortByCustomOrder(arr);
+
   if (by==='newest') arr.sort((a,b)=>new Date(b.lastMod)-new Date(a.lastMod));
   else if (by==='oldest') arr.sort((a,b)=>new Date(a.lastMod)-new Date(b.lastMod));
   else if (by==='name')   arr.sort((a,b)=>a.key.localeCompare(b.key));
   else if (by==='size')   arr.sort((a,b)=>b.size-a.size);
-  else if (by==='custom' && customOrder) {
-    const rank = new Map(customOrder.map((name,i)=>[name,i]));
-    arr.sort((a,b) => {
-      const an = a.key.split('/').pop(), bn = b.key.split('/').pop();
-      const ra = rank.has(an) ? rank.get(an) : Infinity;
-      const rb = rank.has(bn) ? rank.get(bn) : Infinity;
-      if (ra !== rb) return ra - rb;
-      return new Date(b.lastMod) - new Date(a.lastMod);
-    });
-  }
   return arr;
 }
 
@@ -606,7 +632,7 @@ function renderGallery(imgs, highlight=new Set()) {
   gallery.innerHTML = '';
 
   if (!visibleImages.length) {
-    messageTxt.textContent = searchInput.value ? 'Brak wyników.' : 'Brak obrazów w buckecie.';
+    messageTxt.textContent = 'Brak obrazów w buckecie.';
     message.classList.add('visible');
     loadMoreBtn.classList.add('hidden');
     return;
@@ -628,12 +654,17 @@ function renderNextPage(highlight=new Set()) {
     const isN = highlight.has(img.key);
     const src = img.hasThumb ? img.thumbUrl : img.url;
 
+    const basename = img.key.split('/').pop();
     const item = document.createElement('div');
     item.className = 'img-item' + (isN ? ' is-new' : '');
     item.dataset.idx = idx;
     item.innerHTML = `
       <img src="${src}" alt="${img.key}" loading="lazy" />
-      <div class="img-overlay">${img.key.split('/').pop()}<br>${fmtSize(img.size)} · ${fmtTime(img.lastMod)}</div>`;
+      <button class="heart-btn" type="button" aria-label="Polub">
+        <svg viewBox="0 0 24 24"><path d="M12 21s-7.5-4.6-10.2-9.1C.2 8.9 1.4 5.3 4.8 4.3c2-.6 4.1.2 5.4 2 .5.7 1.3 1.9 1.8 2.7.5-.8 1.3-2 1.8-2.7 1.3-1.8 3.4-2.6 5.4-2 3.4 1 4.6 4.6 3 7.6C19.5 16.4 12 21 12 21z"/></svg>
+        <span class="heart-count"></span>
+      </button>
+      <div class="img-overlay">${basename}<br>${fmtSize(img.size)} · ${fmtTime(img.lastMod)}</div>`;
 
     const imgEl = item.querySelector('img');
     imgEl.addEventListener('load', () => {
@@ -646,6 +677,14 @@ function renderNextPage(highlight=new Set()) {
       if (img.url && imgEl.src !== img.url) imgEl.src = img.url;
     });
     item.addEventListener('click', () => openLightbox(idx));
+
+    const heartBtn = item.querySelector('.heart-btn');
+    updateHeartUI(heartBtn, basename);
+    heartBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      toggleLike(basename, heartBtn);
+    });
+
     gallery.appendChild(item);
   });
 
@@ -687,12 +726,79 @@ async function fetchOrder() {
   } catch { return null; }
 }
 
+async function fetchTexts() {
+  try {
+    const res = await fetch(TEXTS_URL, { cache: 'no-store' });
+    if (!res.ok) return;
+    const data = await res.json();
+    const texts = data.texts || {};
+    document.querySelectorAll('[data-text-id]').forEach(el => {
+      const id = el.dataset.textId;
+      if (texts[id] !== undefined) el.textContent = texts[id];
+    });
+  } catch {}
+}
+
+async function fetchLikes() {
+  try {
+    const res = await fetch(LIKES_URL, { cache: 'no-store' });
+    if (!res.ok) return;
+    const data = await res.json();
+    likeCounts = data.counts || {};
+  } catch {}
+}
+
+function loadLikedByMe() {
+  try {
+    likedByMe = new Set(JSON.parse(localStorage.getItem('emores_liked') || '[]'));
+  } catch { likedByMe = new Set(); }
+}
+function saveLikedByMe() {
+  try { localStorage.setItem('emores_liked', JSON.stringify([...likedByMe])); } catch {}
+}
+
+function updateHeartUI(btn, basename) {
+  const liked = likedByMe.has(basename);
+  btn.classList.toggle('liked', liked);
+  const count = likeCounts[basename] || 0;
+  btn.querySelector('.heart-count').textContent = count > 0 ? count : '';
+}
+
+async function toggleLike(basename, btn) {
+  const wasLiked = likedByMe.has(basename);
+  const action = wasLiked ? 'unlike' : 'like';
+
+  // optymistyczna aktualizacja UI
+  if (wasLiked) { likedByMe.delete(basename); likeCounts[basename] = Math.max(0, (likeCounts[basename]||0) - 1); }
+  else          { likedByMe.add(basename);    likeCounts[basename] = (likeCounts[basename]||0) + 1; }
+  saveLikedByMe();
+  updateHeartUI(btn, basename);
+
+  try {
+    const res = await fetch(LIKE_ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: basename, action }),
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    likeCounts[basename] = data.count;
+    updateHeartUI(btn, basename);
+  } catch (err) {
+    // cofnij przy błędzie
+    if (wasLiked) { likedByMe.add(basename); likeCounts[basename] = (likeCounts[basename]||0) + 1; }
+    else          { likedByMe.delete(basename); likeCounts[basename] = Math.max(0, (likeCounts[basename]||0) - 1); }
+    saveLikedByMe();
+    updateHeartUI(btn, basename);
+    console.error('[emores] like', err);
+  }
+}
+
 async function load(isInitial=false) {
   try {
     const imgs = await fetchListing();
     if (isInitial) {
       customOrder = await fetchOrder();
-      if (customOrder) sortSelect.value = 'custom';
     }
     const newKeys = new Set();
     if (!isInitial && knownKeys.size>0)
@@ -962,8 +1068,10 @@ newBanner.addEventListener('click', () => {
   renderGallery(allImages, new Set(pendingNew));
 });
 
-searchInput.addEventListener('input',  () => renderGallery(allImages));
-sortSelect.addEventListener('change',  () => renderGallery(allImages));
+sortSelect.addEventListener('change', () => {
+  usingDefaultOrder = false;
+  renderGallery(allImages);
+});
 
 function showCorsHint() {
   corsHint.innerHTML = `
@@ -989,7 +1097,9 @@ function startCountdown() {
 // Szkielety podczas ładowania
 gallery.innerHTML = Array.from({length:6},()=>'<div class="skeleton"></div>').join('');
 
-load(true).then(startCountdown);
+loadLikedByMe();
+fetchTexts();
+fetchLikes().then(() => load(true).then(startCountdown));
 </script>
 </body>
 </html>
